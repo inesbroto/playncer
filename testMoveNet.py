@@ -114,35 +114,6 @@ while success:
     print(freq)
     client.send_message("/freq", freq)
 
-    #curr_sample = (curr_sample + 1) % skipping_samples
-    #
-            #try:
-            #    samplerate = sd.query_devices(args.device, 'output')['default_samplerate']
-            #    with sd.OutputStream(device=args.device, channels=1, callback=callback,
-            #                        samplerate=samplerate):
-            #        print('#' * 80)
-            #        print('press Return to quit')
-            #        print('#' * 80)
-            #        input()
-            #        #time.sleep(2)
-#
-            #except KeyboardInterrupt:
-            #    parser.exit('')
-            #except Exception as e:
-            #    parser.exit(type(e).__name__ + ': ' + str(e))
-#
-            #if args.debug:
-            #    print("Loop can continue!")
-
-
-            #duration = 0.2  # seconds
-            #sample_rate = 44100
-            #t = np.linspace(0, duration, int(sample_rate * duration), endpoint=False)
-            #frequency = xc  # A4 note
-            #audio = 0.5 * np.sin(2 * np.pi * frequency * t)
-            #sd.play(audio, sample_rate)
-            #sd.wait()
-
     # Shows image
     cv2.imshow('Movenet', img)
     # Waits for the next frame, checks if q was pressed to quit
