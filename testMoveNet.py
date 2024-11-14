@@ -23,10 +23,10 @@ def compute_bbox(keypoints, threshold=0):
     try:
         valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
         valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
-        max_x = tf.reduce_max(valid_keypoints[:,0]).numpy()
-        max_y = tf.reduce_max(valid_keypoints[:,1]).numpy()
-        min_x = tf.reduce_min(valid_keypoints[:,0]).numpy()
-        min_y = tf.reduce_min(valid_keypoints[:,1]).numpy()
+        max_x = tf.reduce_max(valid_keypoints[:,1]).numpy()
+        max_y = tf.reduce_max(valid_keypoints[:,0]).numpy()
+        min_x = tf.reduce_min(valid_keypoints[:,1]).numpy()
+        min_y = tf.reduce_min(valid_keypoints[:,0]).numpy()
 
         return min_x, min_y, max_x-min_x, max_y-min_y
     except Exception as e:
@@ -36,8 +36,8 @@ def compute_gravity_center(keypoints, threshold=0):
     try:
         valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
         valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
-        x_coord =tf.reduce_mean(valid_keypoints[:,0]).numpy()
-        y_coord =tf.reduce_mean(valid_keypoints[:,1]).numpy()
+        x_coord =tf.reduce_mean(valid_keypoints[:,1]).numpy()
+        y_coord =tf.reduce_mean(valid_keypoints[:,0]).numpy()
 
         return (x_coord, y_coord)
     except Exception as e:
@@ -78,7 +78,7 @@ def draw_keypoints(img, keypoints, radius = 2, color = (0,180,0), thickness=2, t
                 #yc = int(k[0] * y)
                 #xc = int(k[1] * x)
 
-                img = draw_point(img=img, x_coord=k[0],y_coord= k[1], radius=radius, color=color, thickness=thickness)
+                img = draw_point(img=img, x_coord=k[1],y_coord= k[0], radius=radius, color=color, thickness=thickness)
                 # Draws a circle on the image for each keypoint
                 #img = cv2.circle(img, (xc, yc), radius, color, thickness)
 
@@ -119,7 +119,7 @@ if __name__ == "__main__":
         OSC_client = udp_client.SimpleUDPClient(args.ip, args.port)
         movenet = load_moveNet_model()
         # Threshold for 
-        threshold = .03
+        threshold = .3
 
         # Loads video source (0 is for main webcam)
         video_source = 0
