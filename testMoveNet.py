@@ -147,6 +147,8 @@ if __name__ == "__main__":
             #time.sleep(10)
             # A frame of video or an image, represented as an int32 tensor of shape: 256x256x3. Channels order: RGB with values in [0, 255].
             tf_img = cv2.resize(img, (256,256))
+            #tf_img = cv2.resize(img, (196,196))
+
             tf_img = cv2.cvtColor(tf_img, cv2.COLOR_BGR2RGB)
             tf_img = np.asarray(tf_img)
             tf_img = np.expand_dims(tf_img,axis=0)
@@ -171,8 +173,8 @@ if __name__ == "__main__":
             grav_center = compute_gravity_center(keypoints, threshold=threshold)
 
 
-            #img = draw_keypoints(img = img, keypoints=keypoints)
-            #img = draw_bbox(img=img,x_coord=x_bbox, y_coord=y_bbox, height=height_bbox, length=length_bbox)
+            img = draw_keypoints(img = img, keypoints=keypoints)
+            img = draw_bbox(img=img,x_coord=x_bbox, y_coord=y_bbox, height=height_bbox, length=length_bbox)
             #img = draw_point(img=img, x_coord=grav_center[0], y_coord=grav_center[1])
 
             #freq = keypoints[0][0][0][0].numpy()*200 +200
@@ -181,13 +183,17 @@ if __name__ == "__main__":
             y, x, _ = img.shape
             x_coord = min(round(keypoints[0][0][0][1].numpy()*x), x-1)
             y_coord = min(round(keypoints[0][0][0][0].numpy()*y),y-1)
-            print(x_coord, y_coord, round(keypoints[0][0][0][1].numpy()*x), round(keypoints[0][0][0][0].numpy()*y))
-            freq = pitch_grid[x_coord][y_coord]
+            print(x_coord, x-1, round(keypoints[0][0][0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0][0][0].numpy()*y))
+            
+            freq = pitch_grid[y_coord][x_coord]
+            ampl = min(bbox_area, 1)
             print('freq:', freq)
+            print('ampl:', bbox_area)
+
             #print(freq,keypoints[0][0][0][0].numpy(), "  |  ",  x_bbox, y_bbox, height_bbox, length_bbox, "  |  ", grav_center)
             #print(keypoints)
             OSC_client.send_message("/freq", freq)
-
+            OSC_client.send_message("/amp", 0.8) 
             #time.sleep(10)
             # Shows image
             cv2.imshow('Movenet', img)
