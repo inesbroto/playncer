@@ -29,7 +29,7 @@ def compute_bbox(keypoints, threshold=0):
         min_x = tf.reduce_min(valid_keypoints[:,1]).numpy()
         min_y = tf.reduce_min(valid_keypoints[:,0]).numpy()
 
-        return min_x, min_y, max_x-min_x, max_y-min_y
+        return min_x, min_y,max_x, max_y, max_x-min_x, max_y-min_y
     except Exception as e:
         print(f"Exception in compute_bbox: {e}")
 
@@ -49,7 +49,8 @@ def compute_gravity_center(keypoints, threshold=0):
 def load_moveNet_model():
     try:
         # Download the model from TF Hub.
-        model = hub.load('https://tfhub.dev/google/movenet/singlepose/thunder/3')
+        #model = hub.load('https://tfhub.dev/google/movenet/singlepose/thunder/3')
+        model = hub.load('https://www.kaggle.com/models/google/movenet/TensorFlow2/singlepose-thunder/4')
         movenet = model.signatures['serving_default']
         return movenet
     except Exception as e:
@@ -132,7 +133,6 @@ if __name__ == "__main__":
             print('Error loading video')
             quit()
 
-
         success, img = cap.read()
 
         if not success:
@@ -141,13 +141,14 @@ if __name__ == "__main__":
 
 
         y, x, _ = img.shape
+        print(x, y, fps)
         pitch_grid = build_pitch_grid(x_dim=x, y_dim=y, printGrid=True)
         while success:
             #print(img.shape)
             #time.sleep(10)
             # A frame of video or an image, represented as an int32 tensor of shape: 256x256x3. Channels order: RGB with values in [0, 255].
             tf_img = cv2.resize(img, (256,256))
-            #tf_img = cv2.resize(img, (196,196))
+            #tf_img = cv2.resize(img, (196,196)) #other model with smaller input dimensions
 
             tf_img = cv2.cvtColor(tf_img, cv2.COLOR_BGR2RGB)
             tf_img = np.asarray(tf_img)
@@ -168,13 +169,13 @@ if __name__ == "__main__":
             keypoints = outputs['output_0']
 
             
-            x_bbox, y_bbox, length_bbox,height_bbox = compute_bbox(keypoints, threshold=threshold)
+            x_min_bbox, y_min_bbox,x_max_bbox, y__max_bbox, length_bbox,height_bbox = compute_bbox(keypoints, threshold=threshold)
             bbox_area = height_bbox*length_bbox
             grav_center = compute_gravity_center(keypoints, threshold=threshold)
 
 
             img = draw_keypoints(img = img, keypoints=keypoints)
-            img = draw_bbox(img=img,x_coord=x_bbox, y_coord=y_bbox, height=height_bbox, length=length_bbox)
+            img = draw_bbox(img=img,x_coord=x_min_bbox, y_coord=y_min_bbox, height=height_bbox, length=length_bbox)
             #img = draw_point(img=img, x_coord=grav_center[0], y_coord=grav_center[1])
 
             #freq = keypoints[0][0][0][0].numpy()*200 +200
@@ -185,15 +186,37 @@ if __name__ == "__main__":
             y_coord = min(round(keypoints[0][0][0][0].numpy()*y),y-1)
             print(x_coord, x-1, round(keypoints[0][0][0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0][0][0].numpy()*y))
             
-            freq = pitch_grid[y_coord][x_coord]
-            ampl = min(bbox_area, 1)
-            print('freq:', freq)
-            print('ampl:', bbox_area)
 
+            freqs = [{"freq": pitch_grid[min(round(keypoints[0][0][i][0].numpy()*y),y-1)][min(round(keypoints[0][0][i][1].numpy()*x), x-1)],
+                      "ampl": keypoints[0][0][i][2].numpy()}
+                      for i in range(len(keypoints[0][0]))]
+            freqs = freqs[:1]+freqs[5:]
+            #print(freqs, len(freqs))
+            #time.sleep(200)
+            #freq = pitch_grid[y_coord][x_coord]
+            #ampl = min(bbox_area, 1)
+            #print('freq:', freq)
+            freqDev = max((1.25/640)*(x_min_bbox*x)**2 - 1.25*(x_min_bbox*x)+200,(1.25/640)*(x_max_bbox*x)**2 - 1.25*(x_max_bbox*x)+200)
+            print(x_min_bbox,x_min_bbox*x,freqDev)
+            print(grav_center,bbox_area, bbox_area*x*y)
+            grav_center_y = min(round(grav_center[1]*y), y-1)
+            grav_center_x = min(round(grav_center[0]*x), x-1)
+            print(f"/freq", pitch_grid[grav_center_y][grav_center_x])
+            print(f"/freqDev", freqDev)
+            grainFreq = bbox_area*(x*y)/10000
+            print(f"/grainFreq",grainFreq)
             #print(freq,keypoints[0][0][0][0].numpy(), "  |  ",  x_bbox, y_bbox, height_bbox, length_bbox, "  |  ", grav_center)
             #print(keypoints)
-            OSC_client.send_message("/freq", freq)
-            OSC_client.send_message("/amp", 0.8) 
+            #time.sleep(200)
+            OSC_client.send_message(f"/freq", pitch_grid[grav_center_y][grav_center_x])
+            OSC_client.send_message(f"/freqDev", freqDev)
+            OSC_client.send_message(f"/grainFreq",grainFreq)
+
+            #print(f"/freq", str(freq)+"_1")
+            #for i, item in enumerate(freqs):
+            #    OSC_client.send_message(f"/freq{i+1}", item['freq'])
+            #    print(f"/freq{i+1}",  item['freq'])
+            #   #OSC_client.send_message("/amp", 0.8) 
             #time.sleep(10)
             # Shows image
             cv2.imshow('Movenet', img)
