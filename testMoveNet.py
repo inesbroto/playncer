@@ -20,31 +20,47 @@ from pythonosc import udp_client
 from aux_functions import build_pitch_grid
 
 
-def compute_bbox(keypoints, threshold=0):
+def compute_bbox(keypoints):
     try:
-        valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
-        valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
-        max_x = tf.reduce_max(valid_keypoints[:,1]).numpy()
-        max_y = tf.reduce_max(valid_keypoints[:,0]).numpy()
-        min_x = tf.reduce_min(valid_keypoints[:,1]).numpy()
-        min_y = tf.reduce_min(valid_keypoints[:,0]).numpy()
+        #valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
+        #valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
+        max_x = tf.reduce_max(keypoints[:,1]).numpy()
+        max_y = tf.reduce_max(keypoints[:,0]).numpy()
+        min_x = tf.reduce_min(keypoints[:,1]).numpy()
+        min_y = tf.reduce_min(keypoints[:,0]).numpy()
 
         return min_x, min_y,max_x, max_y, max_x-min_x, max_y-min_y
     except Exception as e:
         print(f"Exception in compute_bbox: {e}")
 
-def compute_gravity_center(keypoints, threshold=0):
+def compute_gravity_center(keypoints):
     try:
-        valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
-        valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
-        x_coord =tf.reduce_mean(valid_keypoints[:,1]).numpy()
-        y_coord =tf.reduce_mean(valid_keypoints[:,0]).numpy()
+        # [nose, left eye, right eye, left ear, right ear, left shoulder, right shoulder, left elbow, right elbow, left wrist, right wrist, left hip, right hip, left knee, right knee, left ankle, right ankle]
+
+        #valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
+        #valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
+        x_coord =tf.reduce_mean(keypoints[:,1]).numpy()
+        y_coord =tf.reduce_mean(keypoints[:,0]).numpy()
 
         return (x_coord, y_coord)
     except Exception as e:
         print(f"Exception in compute_gravity_center: {e}")
 
 
+method_keypoints = {
+    'all':['nose', 'left eye', 'right eye', 'left ear', 'right ear', 'left shoulder', 'right shoulder', 'left elbow', 'right elbow', 'left wrist', 'right wrist', 'left hip', 'right hip', 'left knee', 'right knee', 'left ankle', 'right ankle'],
+    'dance':['left ear', 'right ear', 'left shoulder', 'right shoulder', 'left elbow', 'right elbow', 'left wrist', 'right wrist', 'left hip', 'right hip', 'left knee', 'right knee', 'left ankle', 'right ankle']
+
+}
+
+def filter_keypoins(keypoints, threshold, focus_method = 'dance'):
+    try:
+        method_filtered_idx = [idx for idx, val in enumerate(method_keypoints['all']) if val in method_keypoints[focus_method]]
+        valid_keypoints = tf.gather(keypoints[0][0], method_filtered_idx)
+        valid_keypoints = tf.gather(valid_keypoints, indices=tf.where(valid_keypoints[:,2]>threshold).numpy(), axis=0)
+        valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
+    except Exception as e:
+        print('Exception in filter_keypoins')
 
 def load_moveNet_model():
     try:
@@ -67,7 +83,7 @@ def draw_point(img,x_coord, y_coord, radius = 2, color = (0,180,0), thickness=2)
     except Exception as e:
         print(f"Exception in draw_point: {e}")
 
-def draw_keypoints(img, keypoints, radius = 2, color = (0,180,0), thickness=2, threshold=0):
+def draw_keypoints(img, keypoints, radius = 2, color = (44,150,46), thickness=2, threshold=0):
     try:
         #y, x, _ = img.shape
         # iterate through keypoints
@@ -104,7 +120,7 @@ def draw_bbox(img, x_coord, y_coord, height, length, color = (180,0,0), thicknes
         cv2.line(img, low_right, up_right, color, thickness) 
         return img
     except Exception as e:
-        print(f"Exception in draw_bbo: {e}")
+        print(f"Exception in draw_bbox: {e}")
 
 if __name__ == "__main__":
     try:
@@ -118,7 +134,6 @@ if __name__ == "__main__":
             help='debugging (default: %(default)s)')
         args = parser.parse_args()
 
-        OSC_client = udp_client.SimpleUDPClient(args.ip, args.port)
         movenet = load_moveNet_model()
         # Threshold for 
         threshold = .3
@@ -139,10 +154,10 @@ if __name__ == "__main__":
             print('Error reding frame')
             quit()
 
-
         y, x, _ = img.shape
         print(x, y, fps)
-        pitch_grid = build_pitch_grid(x_dim=x, y_dim=y, printGrid=True)
+        pitch_grid = build_pitch_grid(x_dim=x, y_dim=y, printGrid=False)
+        OSC_client = udp_client.SimpleUDPClient(args.ip, args.port)
         while success:
             #print(img.shape)
             #time.sleep(10)
@@ -166,17 +181,15 @@ if __name__ == "__main__":
             # Output is a [1, 1, 17, 3] tensor.
             # [nose, left eye, right eye, left ear, right ear, left shoulder, right shoulder, left elbow, right elbow, left wrist, right wrist, left hip, right hip, left knee, right knee, left ankle, right ankle]
             #[x,y, confidence]
-            keypoints = outputs['output_0']
-
+            keypoints = filter_keypoins(keypoints=outputs['output_0'], threshold=threshold, focus_method= 'dance')
             
             x_min_bbox, y_min_bbox,x_max_bbox, y__max_bbox, length_bbox,height_bbox = compute_bbox(keypoints, threshold=threshold)
             bbox_area = height_bbox*length_bbox
             grav_center = compute_gravity_center(keypoints, threshold=threshold)
 
-
-            img = draw_keypoints(img = img, keypoints=keypoints)
+            img = draw_keypoints(img = img, keypoints=outputs['output_0'], radius=2)
             img = draw_bbox(img=img,x_coord=x_min_bbox, y_coord=y_min_bbox, height=height_bbox, length=length_bbox)
-            #img = draw_point(img=img, x_coord=grav_center[0], y_coord=grav_center[1])
+            img = draw_point(img=img, x_coord=grav_center[0], y_coord=grav_center[1], color= (255,192,203), radius=4)
 
             #freq = keypoints[0][0][0][0].numpy()*200 +200
             
