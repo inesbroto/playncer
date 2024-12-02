@@ -15,7 +15,12 @@ def rescale_linear(array, new_min, new_max):
 
 
 
-def build_pitch_grid(x_dim, y_dim, printGrid = False):
+def build_pitch_grid(x_dim, y_dim, printGrid = False, num_random_points=100, min_fq=20, max_fq=2000, corner_pitch_values=None):
+    """
+    num_random_points -> number of random points. the rest is going to be interpolated
+    corner_pitch_values -> corner pitch values so that the whole grid has values and it's no constant outide the last random points
+
+    """
     try:
         # Define grid dimensions
         #x_dim, y_dim = 640, 480
@@ -26,18 +31,17 @@ def build_pitch_grid(x_dim, y_dim, printGrid = False):
         xx, yy = np.meshgrid(x, y)
 
         # Generate random points
-        num_points = 50  # Number of random points
+        num_points = min(x_dim*y_dim, num_random_points)  # Number of random points
         random_x = np.random.randint(0, x_dim, size=num_points)
         random_y = np.random.randint(0, y_dim, size=num_points)
         random_points = np.array(list(zip(random_x, random_y)))
 
         # Assign random pitch values to random points
-        random_pitch_values = np.random.uniform(20, 2000, size=num_points)  # MIDI or Hz
+        random_pitch_values = np.random.uniform(min_fq, max_fq, size=num_points)  # MIDI or Hz
 
         # Define corner points
         corners = [(0, 0), (x_dim - 1, 0), (0, y_dim - 1), (x_dim - 1, y_dim - 1)]
-        corner_pitch_values = [440, 880, 220, 660]  # Assign specific pitch values to corners
-
+        corner_pitch_values = [(min_fq+max_fq)/2]*4 if corner_pitch_values is None else corner_pitch_values #corner_pitch_values are gonna be the mid freq value if not initialized
         # Combine random points and corner points
         all_points = np.vstack((random_points, corners))
         all_pitch_values = np.concatenate((random_pitch_values, corner_pitch_values))
@@ -47,7 +51,7 @@ def build_pitch_grid(x_dim, y_dim, printGrid = False):
             all_points, all_pitch_values, (xx, yy), method='cubic', fill_value=np.nan
         )
 
-        interpolated_pitch = rescale_linear(interpolated_pitch, 200, 5000) #hearing is between 20 and  20000
+        interpolated_pitch = rescale_linear(interpolated_pitch, 200, 800) #hearing is between 20 and  20000
 
         if printGrid:
             # Visualization
