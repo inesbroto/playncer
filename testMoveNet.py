@@ -59,6 +59,7 @@ def filter_keypoins(keypoints, threshold, focus_method = 'dance'):
         valid_keypoints = tf.gather(keypoints[0][0], method_filtered_idx)
         valid_keypoints = tf.gather(valid_keypoints, indices=tf.where(valid_keypoints[:,2]>threshold).numpy(), axis=0)
         valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
+        return valid_keypoints
     except Exception as e:
         print('Exception in filter_keypoins')
 
@@ -106,7 +107,7 @@ def draw_keypoints(img, keypoints, radius = 2, color = (44,150,46), thickness=2,
         print(f"Exception in draw_keypoints: {e}")
 
 
-def draw_bbox(img, x_coord, y_coord, height, length, color = (180,0,0), thickness=2):
+def draw_bbox(img, x_coord, y_coord, height, length, color = (173,216,230), thickness=2):
     try:
         y, x, _ = img.shape
         low_left = (int(x_coord*x), int(y_coord*y))
@@ -136,7 +137,7 @@ if __name__ == "__main__":
 
         movenet = load_moveNet_model()
         # Threshold for 
-        threshold = .3
+        threshold = .0
 
         # Loads video source (0 is for main webcam)
         video_source = 0
@@ -181,28 +182,28 @@ if __name__ == "__main__":
             # Output is a [1, 1, 17, 3] tensor.
             # [nose, left eye, right eye, left ear, right ear, left shoulder, right shoulder, left elbow, right elbow, left wrist, right wrist, left hip, right hip, left knee, right knee, left ankle, right ankle]
             #[x,y, confidence]
-            keypoints = filter_keypoins(keypoints=outputs['output_0'], threshold=threshold, focus_method= 'dance')
+            keypoints = filter_keypoins(keypoints=outputs['output_0'],threshold=threshold,focus_method= 'dance')
             
-            x_min_bbox, y_min_bbox,x_max_bbox, y__max_bbox, length_bbox,height_bbox = compute_bbox(keypoints, threshold=threshold)
+            x_min_bbox, y_min_bbox,x_max_bbox, y__max_bbox, length_bbox,height_bbox = compute_bbox(keypoints)
             bbox_area = height_bbox*length_bbox
-            grav_center = compute_gravity_center(keypoints, threshold=threshold)
+            grav_center = compute_gravity_center(keypoints)
 
-            img = draw_keypoints(img = img, keypoints=outputs['output_0'], radius=2)
+            img = draw_keypoints(img = img, keypoints=outputs['output_0'], radius=2,threshold=threshold,)
             img = draw_bbox(img=img,x_coord=x_min_bbox, y_coord=y_min_bbox, height=height_bbox, length=length_bbox)
             img = draw_point(img=img, x_coord=grav_center[0], y_coord=grav_center[1], color= (255,192,203), radius=4)
 
-            #freq = keypoints[0][0][0][0].numpy()*200 +200
+            #freq = keypoints[0][0].numpy()*200 +200
             
             
             y, x, _ = img.shape
-            x_coord = min(round(keypoints[0][0][0][1].numpy()*x), x-1)
-            y_coord = min(round(keypoints[0][0][0][0].numpy()*y),y-1)
-            print(x_coord, x-1, round(keypoints[0][0][0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0][0][0].numpy()*y))
+            x_coord = min(round(keypoints[0][1].numpy()*x), x-1)
+            y_coord = min(round(keypoints[0][0].numpy()*y),y-1)
+            print(x_coord, x-1, round(keypoints[0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0].numpy()*y))
             
 
-            freqs = [{"freq": pitch_grid[min(round(keypoints[0][0][i][0].numpy()*y),y-1)][min(round(keypoints[0][0][i][1].numpy()*x), x-1)],
-                      "ampl": keypoints[0][0][i][2].numpy()}
-                      for i in range(len(keypoints[0][0]))]
+            freqs = [{"freq": pitch_grid[min(round(keypoints[i][0].numpy()*y),y-1)][min(round(keypoints[i][1].numpy()*x), x-1)],
+                      "ampl": keypoints[i][2].numpy()}
+                      for i in range(len(keypoints))]
             freqs = freqs[:1]+freqs[5:]
             #print(freqs, len(freqs))
             #time.sleep(200)
@@ -218,7 +219,7 @@ if __name__ == "__main__":
             print(f"/freqDev", freqDev)
             grainFreq = bbox_area*(x*y)/10000
             print(f"/grainFreq",grainFreq)
-            #print(freq,keypoints[0][0][0][0].numpy(), "  |  ",  x_bbox, y_bbox, height_bbox, length_bbox, "  |  ", grav_center)
+            #print(freq,keypoints[0][0].numpy(), "  |  ",  x_bbox, y_bbox, height_bbox, length_bbox, "  |  ", grav_center)
             #print(keypoints)
             #time.sleep(200)
             OSC_client.send_message(f"/freq", pitch_grid[grav_center_y][grav_center_x])
