@@ -12,6 +12,7 @@ import tensorflow as tf
 import tensorflow_hub as hub
 import cv2
 import numpy as np
+import math
 
 #osc comunication
 from pythonosc import udp_client
@@ -46,6 +47,12 @@ def compute_gravity_center(keypoints):
     except Exception as e:
         print(f"Exception in compute_gravity_center: {e}")
 
+def compute_tilt(point_a, point_b, eps = 0.03):
+    try:
+        tilt =  abs(point_b[0]-point_a[0])/abs(point_b[1]-point_a[1]) if abs(point_b[1]-point_a[1])>eps else 500
+        return tilt # if tilt >1 else 1
+    except Exception as e:
+        print('Exception in compute_tilt')
 
 method_keypoints = {
     'all':['nose', 'left eye', 'right eye', 'left ear', 'right ear', 'left shoulder', 'right shoulder', 'left elbow', 'right elbow', 'left wrist', 'right wrist', 'left hip', 'right hip', 'left knee', 'right knee', 'left ankle', 'right ankle'],
@@ -159,6 +166,7 @@ if __name__ == "__main__":
         print(x, y, fps)
         pitch_grid = build_pitch_grid(x_dim=x, y_dim=y, printGrid=False)
         OSC_client = udp_client.SimpleUDPClient(args.ip, args.port)
+        focus_method = 'dance'
         while success:
             #print(img.shape)
             #time.sleep(10)
@@ -182,8 +190,19 @@ if __name__ == "__main__":
             # Output is a [1, 1, 17, 3] tensor.
             # [nose, left eye, right eye, left ear, right ear, left shoulder, right shoulder, left elbow, right elbow, left wrist, right wrist, left hip, right hip, left knee, right knee, left ankle, right ankle]
             #[x,y, confidence]
-            keypoints = filter_keypoins(keypoints=outputs['output_0'],threshold=threshold,focus_method= 'dance')
+            keypoints = filter_keypoins(keypoints=outputs['output_0'],threshold=threshold,focus_method= focus_method)
             
+            shoulder_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left shoulder')].numpy(),keypoints[method_keypoints[focus_method].index('right shoulder')].numpy())
+            hands_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left wrist')].numpy(),keypoints[method_keypoints[focus_method].index('right wrist')].numpy())
+            hips_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left hip')].numpy(),keypoints[method_keypoints[focus_method].index('right hip')].numpy())
+            elbow_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left elbow')].numpy(),keypoints[method_keypoints[focus_method].index('right elbow')].numpy())
+            knee_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left knee')].numpy(),keypoints[method_keypoints[focus_method].index('right knee')].numpy())
+            ankle_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left ankle')].numpy(),keypoints[method_keypoints[focus_method].index('right ankle')].numpy())
+            
+            tilt_sum = shoulder_tilt+hands_tilt+hips_tilt+elbow_tilt+knee_tilt+ankle_tilt
+
+            #freqDev = min(math.exp(10*np.array([hands_tilt], dtype='float64')[0]), 1000)
+            freqDev = np.array([math.exp(2*min(tilt_sum,3.5))], dtype='float64')[0]
             x_min_bbox, y_min_bbox,x_max_bbox, y__max_bbox, length_bbox,height_bbox = compute_bbox(keypoints)
             bbox_area = height_bbox*length_bbox
             grav_center = compute_gravity_center(keypoints)
@@ -192,39 +211,47 @@ if __name__ == "__main__":
             img = draw_bbox(img=img,x_coord=x_min_bbox, y_coord=y_min_bbox, height=height_bbox, length=length_bbox)
             img = draw_point(img=img, x_coord=grav_center[0], y_coord=grav_center[1], color= (255,192,203), radius=4)
 
-            #freq = keypoints[0][0].numpy()*200 +200
-            
-            
+
+            right_hand= keypoints[method_keypoints[focus_method].index('right wrist')].numpy()[1]*10
+            left_hand= keypoints[method_keypoints[focus_method].index('left wrist')].numpy()[1]*10
+            print('right:',right_hand,'left', left_hand)
+
+
             y, x, _ = img.shape
             x_coord = min(round(keypoints[0][1].numpy()*x), x-1)
             y_coord = min(round(keypoints[0][0].numpy()*y),y-1)
             print(x_coord, x-1, round(keypoints[0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0].numpy()*y))
             
 
-            freqs = [{"freq": pitch_grid[min(round(keypoints[i][0].numpy()*y),y-1)][min(round(keypoints[i][1].numpy()*x), x-1)],
-                      "ampl": keypoints[i][2].numpy()}
-                      for i in range(len(keypoints))]
-            freqs = freqs[:1]+freqs[5:]
-            #print(freqs, len(freqs))
-            #time.sleep(200)
-            #freq = pitch_grid[y_coord][x_coord]
-            #ampl = min(bbox_area, 1)
-            #print('freq:', freq)
-            freqDev = max((1.25/640)*(x_min_bbox*x)**2 - 1.25*(x_min_bbox*x)+200,(1.25/640)*(x_max_bbox*x)**2 - 1.25*(x_max_bbox*x)+200)
-            print(x_min_bbox,x_min_bbox*x,freqDev)
-            print(grav_center,bbox_area, bbox_area*x*y)
+            #freqs = [{"freq": pitch_grid[min(round(keypoints[i][0].numpy()*y),y-1)][min(round(keypoints[i][1].numpy()*x), x-1)],
+            #          "ampl": keypoints[i][2].numpy()}
+            #          for i in range(len(keypoints))]
+            #freqs = freqs[:1]+freqs[5:]
+   
+            sqrd_dist_from_center_x = 1 - (max((1.25/640)*(x_min_bbox*x)**2 - 1.25*(x_min_bbox*x)+200,(1.25/640)*(x_max_bbox*x)**2 - 1.25*(x_max_bbox*x)+200))/190
+            
             grav_center_y = min(round(grav_center[1]*y), y-1)
             grav_center_x = min(round(grav_center[0]*x), x-1)
+            grainFreq = max(bbox_area*15,1) #(1 - bbox_area)*(x*y)/10000
+
+            print(f"/distance from center_xAxis: {sqrd_dist_from_center_x}")
+            print(f"/hands tilt: {hands_tilt}")
+            print(f"/hands tilt converted: {10 * np.array([hands_tilt], dtype='float64')[0]} type {type(np.array([hands_tilt], dtype='float64')[0])}")
             print(f"/freq", pitch_grid[grav_center_y][grav_center_x])
             print(f"/freqDev", freqDev)
-            grainFreq = bbox_area*(x*y)/10000
             print(f"/grainFreq",grainFreq)
+            print(f"/amp",bbox_area, min(bbox_area, 1))
+            #freqDev = hands_tilt
             #print(freq,keypoints[0][0].numpy(), "  |  ",  x_bbox, y_bbox, height_bbox, length_bbox, "  |  ", grav_center)
             #print(keypoints)
             #time.sleep(200)
+
             OSC_client.send_message(f"/freq", pitch_grid[grav_center_y][grav_center_x])
-            OSC_client.send_message(f"/freqDev", freqDev)
+            #OSC_client.send_message(f"/freqDev", 10*np.array([hands_tilt], dtype='float64')[0])
             OSC_client.send_message(f"/grainFreq",grainFreq)
+            OSC_client.send_message(f"/amp",np.array([min(bbox_area, 1)], dtype='float64')[0])
+            OSC_client.send_message(f"/delayAllPass",right_hand)
+            OSC_client.send_message(f"/decayAllPass",left_hand)
 
             #print(f"/freq", str(freq)+"_1")
             #for i, item in enumerate(freqs):
