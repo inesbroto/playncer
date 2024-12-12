@@ -23,8 +23,6 @@ from aux_functions import build_pitch_grid
 
 def compute_bbox(keypoints):
     try:
-        #valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
-        #valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
         max_x = tf.reduce_max(keypoints[:,1]).numpy()
         max_y = tf.reduce_max(keypoints[:,0]).numpy()
         min_x = tf.reduce_min(keypoints[:,1]).numpy()
@@ -36,10 +34,6 @@ def compute_bbox(keypoints):
 
 def compute_gravity_center(keypoints):
     try:
-        # [nose, left eye, right eye, left ear, right ear, left shoulder, right shoulder, left elbow, right elbow, left wrist, right wrist, left hip, right hip, left knee, right knee, left ankle, right ankle]
-
-        #valid_keypoints = tf.gather(keypoints[0][0], indices=tf.where(keypoints[0][0][:,2]>threshold).numpy(), axis=0)
-        #valid_keypoints = tf.reshape(valid_keypoints, [valid_keypoints.shape[0],valid_keypoints.shape[2]])
         x_coord =tf.reduce_mean(keypoints[:,1]).numpy()
         y_coord =tf.reduce_mean(keypoints[:,0]).numpy()
 
@@ -86,7 +80,6 @@ def draw_point(img,x_coord, y_coord, radius = 2, color = (0,180,0), thickness=2)
     try:
         y, x, _ = img.shape
         img = cv2.circle(img, (int(x_coord*x), int(y_coord*y)), radius, color, thickness)
-
         return img
     except Exception as e:
         print(f"Exception in draw_point: {e}")
@@ -100,10 +93,6 @@ def draw_keypoints(img, keypoints, radius = 2, color = (44,150,46), thickness=2,
             k = k.numpy()
             # Checks confidence for keypoint
             if k[2] > threshold:
-                # The first two channels of the last dimension represents the yx coordinates (normalized to image frame, i.e. range in [0.0, 1.0]) of the 17 keypoints
-                #yc = int(k[0] * y)
-                #xc = int(k[1] * x)
-
                 img = draw_point(img=img, x_coord=k[1],y_coord= k[0], radius=radius, color=color, thickness=thickness)
                 # Draws a circle on the image for each keypoint
                 #img = cv2.circle(img, (xc, yc), radius, color, thickness)
@@ -168,8 +157,6 @@ if __name__ == "__main__":
         OSC_client = udp_client.SimpleUDPClient(args.ip, args.port)
         focus_method = 'dance'
         while success:
-            #print(img.shape)
-            #time.sleep(10)
             # A frame of video or an image, represented as an int32 tensor of shape: 256x256x3. Channels order: RGB with values in [0, 255].
             tf_img = cv2.resize(img, (256,256))
             #tf_img = cv2.resize(img, (196,196)) #other model with smaller input dimensions
@@ -187,10 +174,10 @@ if __name__ == "__main__":
                 print(outputs)
             #break
 
-            # Output is a [1, 1, 17, 3] tensor.
+            # Output is a [1, 1, 17, 3] tensor. Last dimension is [x,y, confidence]
             # [nose, left eye, right eye, left ear, right ear, left shoulder, right shoulder, left elbow, right elbow, left wrist, right wrist, left hip, right hip, left knee, right knee, left ankle, right ankle]
-            #[x,y, confidence]
             keypoints = filter_keypoins(keypoints=outputs['output_0'],threshold=threshold,focus_method= focus_method)
+            
             
             shoulder_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left shoulder')].numpy(),keypoints[method_keypoints[focus_method].index('right shoulder')].numpy())
             hands_tilt = compute_tilt(keypoints[method_keypoints[focus_method].index('left wrist')].numpy(),keypoints[method_keypoints[focus_method].index('right wrist')].numpy())
@@ -201,7 +188,6 @@ if __name__ == "__main__":
             
             tilt_sum = shoulder_tilt+hands_tilt+hips_tilt+elbow_tilt+knee_tilt+ankle_tilt
 
-            #freqDev = min(math.exp(10*np.array([hands_tilt], dtype='float64')[0]), 1000)
             freqDev = np.array([math.exp(2*min(tilt_sum,3.5))], dtype='float64')[0]
             x_min_bbox, y_min_bbox,x_max_bbox, y__max_bbox, length_bbox,height_bbox = compute_bbox(keypoints)
             bbox_area = height_bbox*length_bbox
@@ -220,14 +206,8 @@ if __name__ == "__main__":
             y, x, _ = img.shape
             x_coord = min(round(keypoints[0][1].numpy()*x), x-1)
             y_coord = min(round(keypoints[0][0].numpy()*y),y-1)
-            print(x_coord, x-1, round(keypoints[0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0].numpy()*y))
+            print(x_coord, x-1, round(keypoints[0][1].numpy()*x), y_coord, y-1,round(keypoints[0][0].numpy()*y))   
             
-
-            #freqs = [{"freq": pitch_grid[min(round(keypoints[i][0].numpy()*y),y-1)][min(round(keypoints[i][1].numpy()*x), x-1)],
-            #          "ampl": keypoints[i][2].numpy()}
-            #          for i in range(len(keypoints))]
-            #freqs = freqs[:1]+freqs[5:]
-   
             sqrd_dist_from_center_x = 1 - (max((1.25/640)*(x_min_bbox*x)**2 - 1.25*(x_min_bbox*x)+200,(1.25/640)*(x_max_bbox*x)**2 - 1.25*(x_max_bbox*x)+200))/190
             
             grav_center_y = min(round(grav_center[1]*y), y-1)
@@ -241,26 +221,16 @@ if __name__ == "__main__":
             print(f"/freqDev", freqDev)
             print(f"/grainFreq",grainFreq)
             print(f"/amp",bbox_area, min(bbox_area, 1))
-            #freqDev = hands_tilt
-            #print(freq,keypoints[0][0].numpy(), "  |  ",  x_bbox, y_bbox, height_bbox, length_bbox, "  |  ", grav_center)
-            #print(keypoints)
-            #time.sleep(200)
 
             OSC_client.send_message(f"/freq", pitch_grid[grav_center_y][grav_center_x])
-            #OSC_client.send_message(f"/freqDev", 10*np.array([hands_tilt], dtype='float64')[0])
+            OSC_client.send_message(f"/freqDev", 10*np.array([hands_tilt], dtype='float64')[0])
             OSC_client.send_message(f"/grainFreq",grainFreq)
             OSC_client.send_message(f"/amp",np.array([min(bbox_area, 1)], dtype='float64')[0])
             OSC_client.send_message(f"/delayAllPass",right_hand)
             OSC_client.send_message(f"/decayAllPass",left_hand)
 
-            #print(f"/freq", str(freq)+"_1")
-            #for i, item in enumerate(freqs):
-            #    OSC_client.send_message(f"/freq{i+1}", item['freq'])
-            #    print(f"/freq{i+1}",  item['freq'])
-            #   #OSC_client.send_message("/amp", 0.8) 
-            #time.sleep(10)
-            # Shows image
             cv2.imshow('Movenet', img)
+
             # Waits for the next frame, checks if q was pressed to quit
             if cv2.waitKey(1) == ord("q"):
                 break
