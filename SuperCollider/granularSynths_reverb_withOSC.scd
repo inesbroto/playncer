@@ -70,22 +70,6 @@ SynthDef("aDelay", { arg delay = 0.25;
 
 )
 ​
-
-// Start the grain synth
-x = Synth("Grains");
-
-// Add the delay effect
-y = Synth("aDelay");
-
-x.free;
-y.free;
-
-
-////////////////////////////////////////////////
-// test the grains ... and then turn them off
-// ... they're all on the left channel ... good!
-//Synth("someGrains");
-////////////////////////////////////////////////
 ​
 // make 2 groups, the 1st for sources and the 2nd for effects
 (

@@ -61,13 +61,7 @@ SynthDef("allpass", { arg gain = 0.2;
 }).add;
 
 )
-​
-////////////////////////////////////////////////
-// test the grains ... and then turn them off
-// ... they're all on the left channel ... good!
-//Synth("someGrains");
-////////////////////////////////////////////////
-​
+​​
 // make 2 groups, the 1st for sources and the 2nd for effects
 (
 ~source = Group.head(s);

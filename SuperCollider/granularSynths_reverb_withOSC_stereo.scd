@@ -78,45 +78,25 @@ SynthDef("allpass", { arg gain = 0.2;
         source * gain
     )
 }).add;
-
 )
 ​
 
-// Start the grain synth
-x = Synth("someGrains");
-
-// Add the delay effect
-y = Synth("aDelay");
-
-x.free;
-y.free;
-
-
-////////////////////////////////////////////////
-// test the grains ... and then turn them off
-// ... they're all on the left channel ... good!
-//Synth("someGrains");
-////////////////////////////////////////////////
-​
 // make 2 groups, the 1st for sources and the 2nd for effects
 (
 ~source = Group.head(s);
 ~effects = Group.tail(s);
-//~allpass = Group.tail(s)
 )
 ​
 // place grains into the delay ... source is on the left and delayed source is on the right
 (
 Synth.head(~source, "someGrains");
 Synth.head(~effects, "aDelay");
-//Synth.head(~allpass, "allpass");
 )
 
 ~delayBus.set(500000)
-
 ~freqBus.set(400);  // Set an initial frequency, e.g., 440 Hz
-~freqDevBus.set(500);  // Set an initial frequency, e.g., 440 Hz
-~grainFreqBus.set(100);  // Set an initial frequency, e.g., 440 Hz
+~freqDevBus.set(500); 
+~grainFreqBus.set(100); 
 
 
 
@@ -125,9 +105,7 @@ Synth.head(~effects, "aDelay");
 s.quit()
 
 ~source.set(\grainFreq,2);
-
 ~source.reboot;
-
 ~source.resume;
 
 

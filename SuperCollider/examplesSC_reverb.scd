@@ -1,10 +1,7 @@
 
 
 s.boot()
-// 2 synthdefs - the 1st to make grains and the 2nd to delay them
-​
-// the synthdef that makes the grains is on the left channel
-// the synthdef that delays the grains is on the right channel
+
 
 (
 SynthDef("someGrains", { arg centerFreq = 777, freqDev = 200, grainFreq = 2;
